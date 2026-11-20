@@ -71,6 +71,8 @@ python3 $SK/scaffold.py --pid ABC478E --title-zh 小于与小于等于 --title-e
 
 约定 `a1.in` 与题面样例 1 内容一致（`check_package.py` 会核对）。题解**只**写进 `testdata/sol.md`。
 
+数学记号一律不翻译，原样保留：$a_i \neq t_j$、$1 \le N \le 100$、$\dots$、\vdots、$\sum$、$2\times10^5$ 等照抄，不要改成「不等于」「省略号」「竖省略号」这类中文说法，也不要增删 $ 或 \。
+
 ### 4. 标程、生成器、评测器
 
 - `testdata/std.cpp`：标程。优先官方题解代码；无官方代码时，按可行解法自写并明确告知用户，用对拍证明正确。
@@ -114,8 +116,9 @@ python3 $SK/check_package.py output/abc478_e --zip output/ABC478E_lt_and_le.zip
 | 总分 100 | `subtasks` 的 `score` 求和必须等于 100 |
 | 多解必用 checker | 否则非样例解会被默认比较器判错；`ans` 文件只用于判 `Yes/No` 基线 |
 | 题解位置 | `testdata/sol.md`，不写进 `problem_zh.md` |
-| zip 命名 | `<PID>_<标题>.zip`，内含题目目录一层 |
+| zip 命名 | `<PID>_<标题>.zip`，内含题目目录一层; 多题时打包成一个ZIP，`<PID>_<A-E>.zip`,每个题目一个目录。 |
 | 压缩 | `zip -rq -9`，输出目录 `output/` |
+| 数学记号不翻译 | $a_i \neq t_j$、$\dots$、\vdots、$1 \le N \le 100$ 原样照抄，只译自然语言 |
 
 ## 脚本
 
