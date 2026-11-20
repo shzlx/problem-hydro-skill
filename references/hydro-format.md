@@ -7,12 +7,13 @@
 ├── problem.yaml
 ├── problem_zh.md
 ├── problem_en.md            # 可选，原文
+├── solution/
+│   ├── sol.md             # 题解
 ├── testdata/
 │   ├── config.yaml
 │   ├── std.cpp
 │   ├── gen.cpp
 │   ├── chk.cpp              # 多解 / 构造题需要
-│   ├── sol.md
 │   └── a1.in / a1.out ...
 └── additional_file/         # 图片、PDF（可选）
 ```

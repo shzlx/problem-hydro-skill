@@ -10,11 +10,12 @@ problem-package.zip
 │   ├── problem.yaml
 │   ├── problem_zh.md
 │   ├── problem_en.md          # 可选，国外题目可放原文
+|   ├── solution/
+│   │   ├── sol.md             # 题解（不放 problem_zh.md）
 │   ├── testdata/
 │   │   ├── config.yaml
 │   │   ├── std.cpp
 │   │   ├── gen.cpp            # 数据生成器
-│   │   ├── sol.md             # 题解（不放 problem_zh.md）
 │   │   ├── a1.in
 │   │   ├── a1.out
 │   │   ├── a2.in
@@ -112,7 +113,7 @@ Hydro 支持用代码块声明样例输入输出：
 
 ## 题解与标程
 
-- **题解文件**：写入 `testdata/sol.md`。`problem_zh.md` 只放题面，**不放题解**。
+- **题解文件**：写入 `solution/sol.md`。`problem_zh.md` 只放题面，**不放题解**。
 - **标程来源**：优先从官方题解逐字复制 C++ 代码。若未提供标程代码，**直接向用户索要，不要自行实现**。
 
 ## 测试数据目录
