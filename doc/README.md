@@ -19,10 +19,24 @@
 | 目录 | 说明 |
 |---|---|
 | `libs/` | 通用库，如 `testlib.h` |
-| `userscripts/` | 抓题脚本，按平台分子目录（浏览器篡改猴 + 命令行 Python 两种形态） |
+| `userscripts/` | 抓题 / 题解脚本，按平台分子目录（浏览器篡改猴 + 命令行 Python 两种形态） |
 | `doc/` | 仓库规范和维护文档 |
 | `work/` | 工作目录（gitignored） |
 | `output/` | 输出目录（gitignored） |
+
+## 发版
+
+`.github/workflows/release.yml` 在 push 到 `main` 后自动发版：
+
+| 触发 | 效果 |
+|---|---|
+| commit message 含 `#minor` / `#major` | 按 minor / major 自增版本号 |
+| 普通 commit | patch 自增（`v1.0.2` → `v1.0.3`） |
+| commit message 含 `[skip release]` | 跳过本次发版 |
+| 手动 dispatch | 可指定版本号，或只选 bump |
+
+产物为 `problem-hydro-skill-<tag>.zip`（`git archive`，排除 `.github/`、`work/`、`output/`），
+附在 Release 上，直接解压到 skills 目录即可使用。
 
 ## 文档维护原则
 

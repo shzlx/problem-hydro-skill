@@ -74,6 +74,10 @@ subtasks:
 
 SOL = """# 题解
 
+<!-- 原文抓取：userscripts/atcoder/atcoder-editorial-export.py abc478 --task E --format markdown
+     或 userscripts/codeforces/cf-editorial-export.py 135181 --format markdown
+     成稿写中文，顶部留一行来源链接，本注释可删 -->
+
 ## 思路
 
 TODO
@@ -117,7 +121,9 @@ def main():
 
     pdir = os.path.abspath(args.dir)
     tdir = os.path.join(pdir, "testdata")
+    sdir = os.path.join(pdir, "solution")
     os.makedirs(tdir, exist_ok=True)
+    os.makedirs(sdir, exist_ok=True)
 
     def write(path, text):
         if os.path.exists(path):
@@ -138,7 +144,7 @@ def main():
     tmpl = CONFIG_CK if args.checker else CONFIG_PLAIN
     write(os.path.join(tdir, "config.yaml"),
           tmpl.format(time=args.time, memory=args.memory, cases=cases))
-    write(os.path.join(tdir, "sol.md"), SOL)
+    write(os.path.join(sdir, "sol.md"), SOL)
     print(f"\n骨架已生成：{pdir}（{args.cases} 个测试点占位）")
 
 

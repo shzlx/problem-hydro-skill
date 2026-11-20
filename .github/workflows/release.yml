@@ -1,0 +1,255 @@
+# 提交到 main 后自动打 tag + 发 Release。
+#
+# 版本号规则（取最新的 v* tag 自增）：
+#   - 默认 patch 自增：v1.0.2 -> v1.0.3
+#   - commit message 含 #minor -> minor 自增（v1.1.0）
+#   - commit message 含 #major -> major 自增（v2.0.0）
+#   - commit message 含 [skip release] -> 本次不发版
+#   - 手动触发（workflow_dispatch）可显式指定版本号，或只练 bump
+#
+# 产物：problem-hydro-skill-<tag>.zip（git archive，已排除 .github / work / output）
+name: Auto Tag & Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '指定版本号（如 v1.3.0）；留空则按 bump 自增'
+        required: false
+        type: string
+      bump:
+        description: '版本自增位置'
+        required: false
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+# 用 GITHUB_TOKEN 推 tag、建 Release 都需要 contents: write
+permissions:
+  contents: write
+
+# 串行发版，避免两个提交同时抢同一个 tag
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: 发版前校验
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Python 语法检查
+        run: python -m compileall -q scripts userscripts
+
+      - name: 抓取 / 题解脚本自检
+        run: |
+          set -euo pipefail
+          for s in \
+            userscripts/atcoder/atcoder-contest-export.py \
+            userscripts/atcoder/atcoder-editorial-export.py \
+            userscripts/codeforces/cf-contest-export.py \
+            userscripts/codeforces/cf-editorial-export.py \
+            scripts/scaffold.py scripts/run_cases.py \
+            scripts/check_package.py scripts/fuzz.py
+          do
+            python3 "$s" --help > /dev/null
+            echo "ok $s"
+          done
+
+  release:
+    name: 打 tag 并发 Release
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      skipped: ${{ steps.version.outputs.skip }}
+    steps:
+      # fetch-depth: 0 才能读到全部历史 tag，用于算下一个版本号
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: 计算版本号
+        id: version
+        env:
+          REQ_VERSION: ${{ inputs.version }}
+          BUMP_INPUT: ${{ inputs.bump }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          MSG=$(git log -1 --pretty=%B)
+          echo "本次提交：$(printf '%s' "$MSG" | head -n1)"
+
+          # 1. 显式跳过
+          if [ "$EVENT_NAME" = "push" ] && printf '%s' "$MSG" | grep -qi '\[skip release\]'; then
+            echo "skip=true"  >> "$GITHUB_OUTPUT"
+            echo "reason=commit 含 [skip release]" >> "$GITHUB_OUTPUT"
+            echo "跳过发版"
+            exit 0
+          fi
+
+          # 2. 当前最新 tag
+          LATEST=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n1)
+          LATEST=${LATEST:-v0.0.0}
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "当前最新 tag：$LATEST"
+
+          # 3. 决定版本号
+          if [ -n "${REQ_VERSION:-}" ]; then
+            NEW="$REQ_VERSION"
+            case "$NEW" in v*) ;; *) NEW="v$NEW" ;; esac
+          else
+            BUMP="patch"
+            if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "${BUMP_INPUT:-}" ]; then
+              BUMP="$BUMP_INPUT"
+            elif printf '%s' "$MSG" | grep -q '#major'; then
+              BUMP="major"
+            elif printf '%s' "$MSG" | grep -q '#minor'; then
+              BUMP="minor"
+            fi
+
+            BASE="${LATEST#v}"
+            BASE="${BASE%%-*}"
+            MA=0; MI=0; PA=0
+            IFS=. read -r MA MI PA <<< "$BASE" || true
+            MA=${MA:-0}; MI=${MI:-0}; PA=${PA:-0}
+
+            case "$BUMP" in
+              major) MA=$((MA + 1)); MI=0; PA=0 ;;
+              minor) MI=$((MI + 1)); PA=0 ;;
+              *)     PA=$((PA + 1)) ;;
+            esac
+            NEW="v$MA.$MI.$PA"
+          fi
+
+          if ! printf '%s' "$NEW" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::版本号格式非法：${NEW}（应形如 v1.2.3）"
+            exit 1
+          fi
+
+          # 4. 幂等：tag 已存在且就在 HEAD -> 不再动
+          if git rev-parse -q --verify "refs/tags/$NEW" > /dev/null; then
+            if [ "$(git rev-list -n1 "$NEW")" = "$(git rev-parse HEAD)" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "reason=${NEW} 已指向当前提交" >> "$GITHUB_OUTPUT"
+              echo "${NEW} 已存在且指向 HEAD，跳过"
+              exit 0
+            fi
+            echo "::error::${NEW} 已存在但指向其他提交，请换版本号（当前 HEAD $(git rev-parse --short HEAD)）"
+            exit 1
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "下一个版本：${LATEST} -> ${NEW}"
+
+      - name: 打包 skill
+        if: steps.version.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive --format=zip \
+            --prefix="problem-hydro-skill-${VERSION}/" \
+            -o "dist/problem-hydro-skill-${VERSION}.zip" HEAD
+          unzip -t "dist/problem-hydro-skill-${VERSION}.zip" > /dev/null
+          ls -lh dist/
+          echo "包内文件数：$(unzip -l "dist/problem-hydro-skill-${VERSION}.zip" | tail -1)"
+
+      - name: 生成 Release 说明
+        if: steps.version.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          LATEST: ${{ steps.version.outputs.latest }}
+        run: |
+          set -euo pipefail
+          NOTES="$RUNNER_TEMP/notes.md"
+          {
+            echo "## 变更"
+            echo
+            if git rev-parse -q --verify "refs/tags/${LATEST}" > /dev/null; then
+              CHANGES=$(git log "${LATEST}..HEAD" --no-merges --pretty='- %s（%h，%an）')
+            else
+              CHANGES="- 首个版本"
+            fi
+            if [ -z "${CHANGES:-}" ]; then
+              CHANGES="- 无新提交，重新发版"
+            fi
+            echo "$CHANGES"
+            echo
+            echo "## 产物"
+            echo
+            echo "- \`problem-hydro-skill-${VERSION}.zip\` — 完整 skill 包，解压到 skills 目录即可使用"
+            echo
+            echo "## 包含内容"
+            echo
+            echo "| 路径 | 内容 |"
+            echo "|---|---|"
+            echo "| \`SKILL.md\` | skill 入口与工作流 |"
+            echo "| \`doc/\` | Hydro 题目包规范、C++ 风格 |"
+            echo "| \`references/\` | 格式细节、踩坑记录 |"
+            echo "| \`scripts/\` | scaffold / run_cases / check_package / fuzz |"
+            echo "| \`userscripts/\` | AtCoder / Codeforces 抓题与题解抓取 |"
+            echo "| \`libs/\` | testlib.h |"
+            echo
+            echo "> 由 commit \`$(git rev-parse --short HEAD)\` 自动生成。"
+          } > "$NOTES"
+          cat "$NOTES"
+
+      - name: 打 tag 并推送
+        if: steps.version.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # runner 默认没有 git 身份，annotated tag 会因 empty ident 失败
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "release $VERSION"
+          git push origin "refs/tags/$VERSION"
+
+      - name: 创建或更新 Release
+        if: steps.version.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          ZIP="dist/problem-hydro-skill-${VERSION}.zip"
+          NOTES="$RUNNER_TEMP/notes.md"
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            echo "Release ${VERSION} 已存在，更新产物与说明"
+            gh release upload "$VERSION" "$ZIP" --clobber
+            gh release edit "$VERSION" --notes-file "$NOTES"
+          else
+            gh release create "$VERSION" "$ZIP" \
+              --title "$VERSION" \
+              --notes-file "$NOTES" \
+              --latest
+          fi
+
+      - name: 汇总
+        if: always()
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SKIP: ${{ steps.version.outputs.skip }}
+          REASON: ${{ steps.version.outputs.reason }}
+        run: |
+          if [ "$SKIP" = "true" ]; then
+            echo "### 本次未发版" >> "$GITHUB_STEP_SUMMARY"
+            echo "${REASON}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### 已发布 ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- 产物：\`problem-hydro-skill-${VERSION}.zip\`" >> "$GITHUB_STEP_SUMMARY"
+          fi

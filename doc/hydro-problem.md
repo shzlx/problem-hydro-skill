@@ -62,7 +62,7 @@ pid: P1001
 - 多语言题面可同时存在，Hydro 自动识别并提供切换。
 - 题面应包含：题目描述、输入格式、输出格式、约束、样例和说明。
 - 其他平台题目应包含来源（如 Codeforces 原题链接）。
-- **题解不要写进 `problem_zh.md`**，放到 `testdata/sol.md`。
+- **题解不要写进 `problem_zh.md`**，放到 `solution/sol.md`。
 
 ### 样例写法
 
@@ -114,6 +114,9 @@ Hydro 支持用代码块声明样例输入输出：
 ## 题解与标程
 
 - **题解文件**：写入 `solution/sol.md`。`problem_zh.md` 只放题面，**不放题解**。
+- **题解来源**：用 `userscripts/atcoder/atcoder-editorial-export.py` 或
+  `userscripts/codeforces/cf-editorial-export.py` 抓原文，落 `work/`；`sol.md` 写中文成稿，
+  顶部一行来源链接，正文按「思路 / 复杂度 / 参考代码 / 数据说明」组织。
 - **标程来源**：优先从官方题解逐字复制 C++ 代码。若未提供标程代码，**直接向用户索要，不要自行实现**。
 
 ## 测试数据目录

@@ -78,6 +78,16 @@ subtasks:
 - 同时写 `cases` 和 `subtasks` 时以 `cases` 优先；新题只用 `subtasks`。
 - 单点可覆盖全局 `time` / `memory`。
 
+## 题解文件 `solution/sol.md`
+
+纯 Markdown，与题面分开，Hydro 单独展示。
+
+- 顶部一行来源链接，正文按「思路 / 复杂度 / 参考代码 / 数据说明」四段；
+- 内容用中文，代码块 ` ```cpp ` 保留官方实现原样；
+- 原文抓取用 `userscripts/atcoder/atcoder-editorial-export.py` 或
+  `userscripts/codeforces/cf-editorial-export.py`，先落 `work/`，再改写；
+- `problem_zh.md` 里不出现题解内容。
+
 ## 题面样例语法
 
 ````markdown

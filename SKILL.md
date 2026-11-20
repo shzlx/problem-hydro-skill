@@ -1,6 +1,6 @@
 ---
 name: problem-hydro-skill
-description: 把 AtCoder / Codeforces 等平台的竞赛题目整理成可直接导入 Hydro OJ 的题目包（problem.yaml + problem_zh.md + testdata 中的 config.yaml / std.cpp / gen.cpp / checker / 测试数据），并完成本地评测、对拍与打包校验。当用户说「抓题打包」「把 abcXXX 某题做成题目包」「AtCoder 题目转 Hydro」「导入 Hydro」「继续打包 B/C/D 题」「重新打包/校验已有题目包」时使用。This skill should be used when a user asks to fetch an online judge problem and package it as a Hydro OJ problem package, or to verify, rebuild and repackage an existing one.
+description: 把 AtCoder / Codeforces 等平台的竞赛题目整理成可直接导入 Hydro OJ 的题目包（problem.yaml + problem_zh.md + testdata 中的 config.yaml / std.cpp / gen.cpp / checker / 测试数据），并完成本地评测、对拍与打包校验；同时提供题目抓取与题解（editorial）抓取脚本。当用户说「抓题打包」「把 abcXXX 某题做成题目包」「AtCoder 题目转 Hydro」「导入 Hydro」「继续打包 B/C/D 题」「重新打包/校验已有题目包」「抓一下这题的题解」「导出 editorial」时使用。This skill should be used when a user asks to fetch an online judge problem and package it as a Hydro OJ problem package, or to verify, rebuild and repackage an existing one.
 ---
 
 # Codeforces / AtCoder → Hydro 题目包
@@ -18,7 +18,9 @@ description: 把 AtCoder / Codeforces 等平台的竞赛题目整理成可直接
 | `doc/hydro-problem.md` | 目录结构、`problem.yaml`、`config.yaml`、特殊评测 |
 | `doc/cpp-code-style.md` | C++ 风格：`-O2 -std=c++14`、`bits/stdc++.h`、`ios::sync_with_stdio(false)` |
 | `userscripts/atcoder/atcoder-contest-export.py` | AtCoder 抓题脚本 |
+| `userscripts/atcoder/atcoder-editorial-export.py` | AtCoder 题解抓取脚本（单篇 / 整场索引） |
 | `userscripts/codeforces/cf-contest-export.py` | Codeforces 抓题脚本（由同目录 userscript 改写的命令行版） |
+| `userscripts/codeforces/cf-editorial-export.py` | Codeforces 题解抓取脚本（blog entry，优先 `blogEntry.view` 接口） |
 
 目录：题目包 `output/<pid小写>/`，临时文件 `work/`，脚本 `scripts/`。
 本 skill 的脚本在 `scripts/`（下称 `$SK`）。
@@ -73,7 +75,22 @@ python3 $SK/scaffold.py --pid ABC478E --title-zh 小于与小于等于 --title-e
 
 数学记号一律不翻译，原样保留：$a_i \neq t_j$、$1 \le N \le 100$、$\dots$、\vdots、$\sum$、$2\times10^5$ 等照抄，不要改成「不等于」「省略号」「竖省略号」这类中文说法，也不要增删 $ 或 \。
 
-### 4. 标程、生成器、评测器
+### 4. 抓题解
+
+```bash
+# AtCoder：题解页 / 索引页 / 比赛 ID / task id 都可作目标
+python3 userscripts/atcoder/atcoder-editorial-export.py abc248 --task B --format markdown --out work/abc248_b_sol.md
+
+# Codeforces：blog entry id 或 URL
+python3 userscripts/codeforces/cf-editorial-export.py 135181 --format markdown --out work/cf135181_sol.md
+```
+
+- 抓回的是**原文**（AtCoder 默认 `en`，索引缺英文自动回落 `ja`；`--lang ja` 强制日文），先落 `work/`，再按中文重写进 `solution/sol.md`。
+- 输出的 markdown 顶部带「题解链接 / 作者 / 发布时间」元信息；`sol.md` 只保留正文，元信息压成一行来源链接。
+- 标程代码从 `codeBlocks` 取（AtCoder 在顶层，CF 在 `sections[].codeBlocks`），贴进 `testdata/std.cpp`。
+- `--variants all` 取同题全部版本（官方 + 用户）；`--lean` 精简 JSON 省 token；`--refresh` 跳过 1 小时缓存。退出码：AtCoder 2=参数错、3=全失败、4=部分失败；CF 单篇只有 2=参数错、3=抓取失败。
+
+### 5. 标程、生成器、评测器
 
 - `testdata/std.cpp`：标程。优先官方题解代码；无官方代码时，按可行解法自写并明确告知用户，用对拍证明正确。
 - `testdata/gen.cpp`：testlib 生成器，参数化（seed + 规模 + 模式），支持「保证有解 / 保证无解 / 纯随机」几档。
@@ -82,7 +99,7 @@ python3 $SK/scaffold.py --pid ABC478E --title-zh 小于与小于等于 --title-e
 
 数据点至少要覆盖：题面样例、最小规模、最大规模、退化情形（全相等 / 全部无解 / 链状 / 星形）、极端值域、能卡掉错解的构造点。
 
-### 5. 校验
+### 6. 校验
 
 ```bash
 # 用标程重算 .out，并逐点用 checker 校验
@@ -103,7 +120,7 @@ python3 $SK/check_package.py output/abc478_e --zip output/ABC478E_lt_and_le.zip
 2. 每个点用 checker 自检通过；
 3. `check_package.py` 全 PASS，且 `unzip -t` 通过。
 
-### 6. 交付
+### 7. 交付
 
 `present_files` 给出 zip。回复里说明：题号标题、分值/时空限制、测试点覆盖表、校验结果（对拍组数、checker 自检、耗时最慢点）、以及标程来源（官方 or 自写）。
 
@@ -115,12 +132,12 @@ python3 $SK/check_package.py output/abc478_e --zip output/ABC478E_lt_and_le.zip
 | `pid` 格式 | `ABC478E`、`CF2232A` |
 | 总分 100 | `subtasks` 的 `score` 求和必须等于 100 |
 | 多解必用 checker | 否则非样例解会被默认比较器判错；`ans` 文件只用于判 `Yes/No` 基线 |
-| 题解位置 | `solution/sol.md`，不写进 `problem_zh.md` |
+| 题解位置 | `solution/sol.md`，不写进 `problem_zh.md`；抓来的原文落 `work/`，成稿写中文 |
 | zip 命名 | `<PID>_<标题>.zip`，内含题目目录一层; 多题时打包成一个ZIP，`<PID>_<A-E>.zip`,每个题目一个目录。 |
 | 压缩 | `zip -rq -9`，输出目录 `output/` |
 | 数学记号不翻译 | $a_i \neq t_j$、$\dots$、\vdots、$1 \le N \le 100$ 原样照抄，只译自然语言 |
 
-## 脚本
+## 脚本（`scripts/`）
 
 | 脚本 | 作用 |
 |---|---|
@@ -128,6 +145,8 @@ python3 $SK/check_package.py output/abc478_e --zip output/ABC478E_lt_and_le.zip
 | `run_cases.py` | 编译 std/checker，跑全部测试点，`--write` 重算 `.out` |
 | `check_package.py` | 规范校验（title/pid/总分/文件配对/样例一致性），`--zip` 打包 |
 | `fuzz.py` | 对拍，`--cmp first\|token\|full`，`--dump-fail` 存失败用例 |
+
+题目 / 题解抓取脚本在 `userscripts/<平台>/`，命令行约定（stdout 只出数据、日志走 stderr、退出码 2/3/4）与上面一致；详细参数见各目录 `README.md`。
 
 ## 参考
 
